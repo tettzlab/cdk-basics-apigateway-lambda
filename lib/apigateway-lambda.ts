@@ -9,24 +9,25 @@ import {
 } from '@aws-cdk/aws-apigatewayv2-integrations-alpha'
 import { Construct } from 'constructs'
 
-interface ApiBackend {
-  id: string
-  existingLambda?: lambda.IFunction
-  lambdaProps?: lambda.FunctionProps
-  lambdaIntegrationProps?: HttpLambdaIntegrationProps
-  url?: string
-  urlIntegrationProps?: HttpUrlIntegrationProps
+interface ApiMappingOptions {
+  readonly id: string
+  readonly existingLambda?: lambda.IFunction
+  readonly lambdaProps?: lambda.FunctionProps
+  readonly lambdaIntegrationProps?: HttpLambdaIntegrationProps
+  readonly url?: string
+  readonly urlIntegrationProps?: HttpUrlIntegrationProps
+  readonly routeOpts?: Partial<apigwv2.AddRoutesOptions>
 }
 
-interface MethodMappings {
-  [methods: string]: ApiBackend
+interface ApiMapping {
+  readonly [methods: string]: ApiMappingOptions
 }
 
 export interface ApiGatewayLambdaProps extends StackProps {
-  httpApiProps?: apigwv2.HttpApiProps
-  defaultApi?: ApiBackend
-  apiMappings?: {
-    [path: string]: MethodMappings
+  readonly httpApiProps?: Partial<apigwv2.HttpApiProps>
+  readonly defaultApi?: ApiMappingOptions
+  readonly apiMappings?: {
+    [path: string]: ApiMapping
   }
 }
 
@@ -41,9 +42,9 @@ export class ApiGatewayLambda extends Construct {
 
     this.apiMappings = {}
 
-    const createIntegration = (backend: ApiBackend): apigwv2.HttpRouteIntegration => {
+    const createIntegration = (opts: ApiMappingOptions): apigwv2.HttpRouteIntegration => {
       const { id, existingLambda, lambdaProps, lambdaIntegrationProps, url, urlIntegrationProps } =
-        backend
+        opts
       let ret: apigwv2.HttpRouteIntegration | undefined
       if (existingLambda) {
         if (lambdaProps || url) {
@@ -106,11 +107,13 @@ export class ApiGatewayLambda extends Construct {
         if (methods.length === 0) {
           throw new Error() //FIXME
         }
-        const integration = createIntegration(api[methodNames])
+        const opts = api[methodNames]
+        const integration = createIntegration(opts)
         httpApi.addRoutes({
           path: path,
           methods: methods as apigwv2.HttpMethod[],
           integration: integration,
+          ...(opts.routeOpts ?? {}),
         })
       }
     }
